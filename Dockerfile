@@ -14,14 +14,19 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Upgrade pip and install Python dependencies
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
 
 # Create necessary directories
 RUN mkdir -p knowledge_base chroma_db static templates
+
+# Set environment variables with defaults
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
 
 # Build the vector database if knowledge base files exist
 # This will use the GOOGLE_API_KEY_1 provided during the build process
@@ -45,9 +50,9 @@ RUN if [ -n "$(ls -A knowledge_base/ 2>/dev/null)" ]; then python build_db.py; f
 # Expose port 8000 for FastAPI
 EXPOSE 8000
 
-# Health check for FastAPI
+# Health check for FastAPI - updated endpoint
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/api/health || exit 1
 
-# Run FastAPI with uvicorn
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run multi-org FastAPI application with uvicorn
+CMD ["uvicorn", "run:app", "--host", "0.0.0.0", "--port", "8000"]
