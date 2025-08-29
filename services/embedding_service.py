@@ -158,18 +158,20 @@ class EmbeddingService:
             )
             
             # System prompt
-            system_prompt = f"""You are an advanced AI assistant with expertise in understanding and explaining complex information for company {company_id}.
-Your role is to answer user questions comprehensively using the provided knowledge base context.
+            system_prompt = f"""You are an advanced AI assistant for company {company_id}. Always mention the company {company_id} in your responses.
+Your role is to answer user questions using the knowledge base context.
 
 Guidelines:
-1. Always ground your answers in the provided context, but expand with reasoning, clarification, and related insights.
-2. Provide clear, structured, and well-organized responses (use sections, bullet points, or lists where helpful).
-3. Be detailed — explain concepts fully instead of giving short or vague replies.
-4. Highlight key insights, important details, and actionable information.
-5. If something is unclear in the context, infer the most likely explanation and explicitly state your assumptions.
-6. If the information truly does not exist in the knowledge base, say: 
-   "The available knowledge base does not provide a direct answer to this question," 
-   and suggest possible directions or related knowledge.
+1. Use only the knowledge base to generate answers. Do not mention or describe the documents or context explicitly.
+2. Provide responses that are concise yet slightly expanded for clarity. 
+3. Adapt answer style dynamically:
+   - Use bullet points for lists, steps, or features.
+   - Use short paragraphs for explanations or reasoning.
+4. If the requested information is not available in the knowledge base, respond with:
+   "This information is currently not available. For more details, please contact [insert company contact info if available]."
+5. Maintain a friendly but professional tone.
+6. Always tailor answers to company {company_id}, explicitly mentioning it when relevant.
+7. Avoid filler phrases such as "the uploaded text says" or "the context provides."
 
 Context:
 {{context}}"""
@@ -291,7 +293,7 @@ Context:
                     raise ValueError(f"Could not load document: {file_path}")
             
             # Create a RAG chain for this file
-            rag_chain = self._create_single_file_rag_chain(file_vectorstore)
+            rag_chain = self._create_single_file_rag_chain(file_vectorstore, company_id)
             
             # Convert chat history to LangChain format
             chat_history_for_chain = []
@@ -352,7 +354,7 @@ Context:
         except Exception as e:
             print(f"Error creating file collection for {company_id}/{file_id}: {e}")
     
-    def _create_single_file_rag_chain(self, vectorstore):
+    def _create_single_file_rag_chain(self, vectorstore, company_id: str = None):
         """Create a RAG chain for a single file"""
         from langchain.chains import create_history_aware_retriever, create_retrieval_chain
         from langchain.chains.combine_documents import create_stuff_documents_chain
@@ -390,13 +392,14 @@ just reformulate it if needed and otherwise return it as is."""
             llm, retriever, contextualize_q_prompt
         )
         
-        # QA prompt
-        qa_system_prompt = """You are an assistant for question-answering tasks. \
+        # QA prompt with company context
+        company_context = f" for company {company_id}" if company_id else ""
+        qa_system_prompt = f"""You are an AI assistant{company_context}. \
 Use the following pieces of retrieved context to answer the question. \
 If you don't know the answer, just say that you don't know. \
-Keep the answer concise but comprehensive.
+Keep the answer concise but comprehensive.{' Always mention the company ' + company_id + ' when relevant.' if company_id else ''}
 
-{context}"""
+{{context}}"""
         
         qa_prompt = ChatPromptTemplate.from_messages([
             ("system", qa_system_prompt),
