@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - ttRag</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .admin-header {
+            background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .admin-header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .back-link {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 25px;
+            transition: background 0.3s;
+        }
+
+        .back-link:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .admin-content {
+            padding: 40px;
+        }
+
+        .admin-section {
+            margin-bottom: 40px;
+            padding: 30px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 5px solid #4285f4;
+        }
+
+        .admin-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .upload-area {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        input[type="file"] {
+            padding: 10px;
+            border: 2px dashed #4285f4;
+            border-radius: 8px;
+            background: white;
+            flex: 1;
+            min-width: 250px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(66, 133, 244, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .delete-btn {
+            background: linear-gradient(135deg, #ea4335 0%, #dc3545 100%);
+            padding: 8px 16px;
+            font-size: 0.9em;
+        }
+
+        .delete-btn:hover {
+            box-shadow: 0 5px 15px rgba(234, 67, 53, 0.3);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        #uploadStatus, #buildStatus {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            background: white;
+            border: 1px solid #e9ecef;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .status-message {
+            margin: 5px 0;
+            padding: 8px 12px;
+            border-radius: 5px;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4285f4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .file-info {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .no-files {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="admin-header">
+            <a href="/" class="back-link">← Back to Chat</a>
+            <h1>Knowledge Base Management</h1>
+            <p>Manage your AI assistant's knowledge base</p>
+        </div>
+
+        <div class="admin-content">
+            <!-- Upload Section -->
+            <div class="admin-section">
+                <h2>📁 Upload Knowledge Base Files</h2>
+                <p class="file-info">Upload .txt, .json, .pdf, or .docx files to expand the knowledge base</p>
+                <div class="upload-area">
+                    <input type="file" id="fileInput" accept=".txt,.json,.pdf,.docx" multiple>
+                    <button id="uploadButton">Upload Files</button>
+                </div>
+                <div id="uploadStatus"></div>
+            </div>
+
+            <!-- Files List Section -->
+            <div class="admin-section">
+                <h2>📋 Knowledge Base Files</h2>
+                <button id="refreshFiles">🔄 Refresh List</button>
+                <div id="filesList"></div>
+            </div>
+
+            <!-- Build Database Section -->
+            <div class="admin-section">
+                <h2>🔧 Vector Database</h2>
+                <p class="file-info">Rebuild the vector database after uploading new files</p>
+                <button id="buildDatabase">🚀 Build/Rebuild Database</button>
+                <div id="buildStatus"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Upload functionality
+        document.getElementById('uploadButton').addEventListener('click', async function() {
+            const fileInput = document.getElementById('fileInput');
+            const files = fileInput.files;
+            const uploadStatus = document.getElementById('uploadStatus');
+            
+            if (files.length === 0) {
+                uploadStatus.innerHTML = '<div class="status-message error">Please select files to upload</div>';
+                return;
+            }
+            
+            uploadStatus.innerHTML = '<div class="status-message info"><span class="loading"></span>Uploading files...</div>';
+            
+            for (let file of files) {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                try {
+                    const response = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        uploadStatus.innerHTML += 
+                            `<div class="status-message success">✓ ${result.filename} uploaded successfully (${formatFileSize(result.size)})</div>`;
+                    } else {
+                        uploadStatus.innerHTML += 
+                            `<div class="status-message error">✗ Error uploading ${file.name}: ${result.detail}</div>`;
+                    }
+                } catch (error) {
+                    uploadStatus.innerHTML += 
+                        `<div class="status-message error">✗ Error uploading ${file.name}: ${error.message}</div>`;
+                }
+            }
+            
+            // Clear file input and refresh files list
+            fileInput.value = '';
+            loadFilesList();
+        });
+
+        // Load files list
+        async function loadFilesList() {
+            const filesList = document.getElementById('filesList');
+            
+            try {
+                filesList.innerHTML = '<div class="status-message info"><span class="loading"></span>Loading files...</div>';
+                
+                const response = await fetch('/api/files');
+                const files = await response.json();
+                
+                filesList.innerHTML = '';
+                
+                if (files.length === 0) {
+                    filesList.innerHTML = '<div class="no-files">No files uploaded yet. Upload some knowledge base files to get started!</div>';
+                    return;
+                }
+                
+                const table = document.createElement('table');
+                table.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th>📄 Filename</th>
+                            <th>📏 Size</th>
+                            <th>📅 Created</th>
+                            <th>⚡ Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                `;
+                
+                const tbody = table.querySelector('tbody');
+                
+                files.forEach(file => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>
+                            <strong>${file.filename}</strong>
+                            <br><small style="color: #666;">${file.extension.toUpperCase()} file</small>
+                        </td>
+                        <td>${formatFileSize(file.size)}</td>
+                        <td>${new Date(file.created_at).toLocaleString()}</td>
+                        <td>
+                            <button onclick="deleteFile('${file.filename}')" class="delete-btn">🗑️ Delete</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+                
+                filesList.appendChild(table);
+            } catch (error) {
+                filesList.innerHTML = 
+                    `<div class="status-message error">Error loading files: ${error.message}</div>`;
+            }
+        }
+
+        // Delete file
+        async function deleteFile(filename) {
+            if (!confirm(`Are you sure you want to delete "${filename}"?\n\nThis action cannot be undone.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/files/${filename}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert('✓ File deleted successfully');
+                    loadFilesList();
+                } else {
+                    alert(`✗ Error deleting file: ${result.detail}`);
+                }
+            } catch (error) {
+                alert(`✗ Error deleting file: ${error.message}`);
+            }
+        }
+
+        // Build database
+        document.getElementById('buildDatabase').addEventListener('click', async function() {
+            const buildStatus = document.getElementById('buildStatus');
+            
+            try {
+                buildStatus.innerHTML = '<div class="status-message info"><span class="loading"></span>Starting database build...</div>';
+                
+                const response = await fetch('/api/build_db', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                buildStatus.innerHTML = 
+                    `<div class="status-message info">${result.message}</div>`;
+                
+                // Poll for status updates
+                if (result.status === 'building') {
+                    checkBuildStatus();
+                }
+            } catch (error) {
+                buildStatus.innerHTML = 
+                    `<div class="status-message error">Error: ${error.message}</div>`;
+            }
+        });
+
+        // Check build status
+        async function checkBuildStatus() {
+            try {
+                const response = await fetch('/api/build_status');
+                const status = await response.json();
+                
+                const buildStatus = document.getElementById('buildStatus');
+                
+                if (status.status === 'building') {
+                    buildStatus.innerHTML = 
+                        `<div class="status-message info"><span class="loading"></span>Status: ${status.status} - ${status.message}</div>`;
+                    setTimeout(checkBuildStatus, 2000);
+                } else if (status.status === 'completed') {
+                    buildStatus.innerHTML = 
+                        `<div class="status-message success">✓ ${status.message}</div>`;
+                } else if (status.status === 'error') {
+                    buildStatus.innerHTML = 
+                        `<div class="status-message error">✗ ${status.message}</div>`;
+                } else {
+                    buildStatus.innerHTML = 
+                        `<div class="status-message info">Status: ${status.status} - ${status.message || 'Ready'}</div>`;
+                }
+            } catch (error) {
+                console.error('Error checking build status:', error);
+            }
+        }
+
+        // Utility functions
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Refresh files list
+        document.getElementById('refreshFiles').addEventListener('click', loadFilesList);
+
+        // Load files list and check build status on page load
+        loadFilesList();
+        checkBuildStatus();
+
+        // Auto-refresh build status every 30 seconds if building
+        setInterval(async () => {
+            try {
+                const response = await fetch('/api/build_status');
+                const status = await response.json();
+                if (status.status === 'building') {
+                    checkBuildStatus();
+                }
+            } catch (error) {
+                console.error('Error in auto-refresh:', error);
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

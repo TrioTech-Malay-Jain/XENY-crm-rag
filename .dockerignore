@@ -1,0 +1,61 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Git
+.git/
+.gitignore
+
+# Environment files (will be provided via build args)
+.env
+.env.local
+.env.development
+
+# Vector database (will be built in container)
+chroma_db/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation and legacy code
+*.md
+docs/
+flask_structure/
+
+# Test files
+test_*
+*_test.py
+create_test_files.py
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+
+# Coverage reports
+htmlcov/
+.coverage
+.pytest_cache/
+
+# Jupyter notebooks
+*.ipynb
+
+# Large model files
+*.bin
+*.model
