@@ -60,6 +60,7 @@ Guidelines:
 5. Maintain a friendly but professional tone.
 6. Always tailor answers to the relevant document being used for query retrieval.
 7. Avoid filler phrases such as "the uploaded text says" or "the context provides."
+8. The responses should be in the structured format, in markdown language.
 {additional_instructions}
 Context:
 {{context}}"""
