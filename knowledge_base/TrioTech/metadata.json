@@ -1,28 +1,15 @@
 {
-  "8f8cfa89-b0b4-4984-a94b-a8d0a443542a": {
-    "file_id": "8f8cfa89-b0b4-4984-a94b-a8d0a443542a",
-    "filename": "8f8cfa89-b0b4-4984-a94b-a8d0a443542a.json",
-    "original_filename": "triotech_content.json",
+  "c8b90fe5-272c-4e82-9520-847f8849487f": {
+    "file_id": "c8b90fe5-272c-4e82-9520-847f8849487f",
+    "filename": "c8b90fe5-272c-4e82-9520-847f8849487f.json",
+    "original_filename": "8f8cfa89-b0b4-4984-a94b-a8d0a443542a.json",
     "company_id": "TrioTech",
     "size": 2098,
     "extension": ".json",
-    "created_at": "2025-08-28 17:20:25.890043",
+    "created_at": "2025-09-03 16:43:36.104023",
     "metadata": {
       "status": "uploaded",
       "content_type": "application/json"
-    }
-  },
-  "f9f335c5-6bb6-4a1a-81a2-754fdeac5284": {
-    "file_id": "f9f335c5-6bb6-4a1a-81a2-754fdeac5284",
-    "filename": "f9f335c5-6bb6-4a1a-81a2-754fdeac5284.txt",
-    "original_filename": "triotech_knowledge.txt",
-    "company_id": "TrioTech",
-    "size": 12730,
-    "extension": ".txt",
-    "created_at": "2025-08-28 17:20:29.462400",
-    "metadata": {
-      "status": "uploaded",
-      "content_type": "text/plain"
     }
   }
 }

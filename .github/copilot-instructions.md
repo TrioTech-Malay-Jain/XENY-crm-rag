@@ -1,7 +1,7 @@
 # AI Coding Assistant Instructions for CCD-AI Multi-Organization RAG System
 
 ## Project Overview
-This is a production-ready Retrieval Augmented Generation (RAG) system supporting multiple organizations with complete data isolation. Built with FastAPI, LangChain, ChromaDB, and Google Generative AI.
+This is a production-ready Retrieval Augmented Generation (RAG) system supporting multiple organizations with complete data isolation. Built with FastAPI, LangChain, ChromaDB, and Azure OpenAI.
 
 ## Architecture & Data Flow
 
@@ -40,13 +40,37 @@ python run.py
 - Automatic background vector DB building triggers on upload
 - Supports: `.txt`, `.pdf`, `.docx`, `.json`
 
-### API Key Management
+### Azure OpenAI Configuration
 ```python
-# Multiple keys for rate limiting
-GOOGLE_API_KEY_1="key1"
-GOOGLE_API_KEY_2="key2"
-# System rotates keys automatically on quota/rate limit errors
+# Set environment variables
+AZURE_OPENAI_API_KEY="your_key"
+AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
+AZURE_OPENAI_DEPLOYMENT="gpt-4o"
+AZURE_OPENAI_API_VERSION="2024-08-01-preview"
+
+# Initialize in code
+llm = AzureChatOpenAI(
+    openai_api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    deployment_name=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
+    openai_api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+    temperature=0
+)
 ```
+
+### Migration from Google to Azure
+Replace `ChatGoogleGenerativeAI` with `AzureChatOpenAI` in services:
+```python
+# Before
+llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0)
+
+# After
+llm = AzureChatOpenAI(
+    deployment_name=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
+    temperature=0
+)
+```
+Update embeddings similarly in `chroma_manager.py`.
 
 ## Project-Specific Patterns & Conventions
 
@@ -80,20 +104,40 @@ metadata[file_id] = FileInfo(
 collection_name = f"{COLLECTION_PREFIX}{sanitized_company_id}"
 ```
 
-### Error Handling & API Key Rotation
+### Fuzzy Query Matching
 ```python
-try:
-    response = llm.invoke(query)
-except Exception as e:
-    if "quota" in str(e).lower():
-        self.rotate_api_key()  # Switch to next API key
-        # Retry operation
+# Handle name variations in embedding_service.py
+name_normalizations = {
+    'urban piper': 'UrbanPiper',
+    'trio tech': 'TrioTech'
+}
+# Generate query variations for better retrieval
+```
+
+### System Prompt Template
+Use the centralized prompt in `embedding_service.py` for consistent responses:
+```python
+base_system_prompt = """You are an advanced AI assistant for company {company_id}. Always mention the company {company_id} in your responses.
+Your role is to answer user questions using the {context_source} context.
+...
+Context:
+{{context}}"""
+```
+
+### Lifespan Management
+Use FastAPI's lifespan for startup tasks in `run.py`:
+```python
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Create directories, check API keys
+    # Yield
+    # Shutdown: Cleanup
 ```
 
 ## Integration Points & Dependencies
 
 ### External Services
-- **Google Generative AI**: Embeddings (`models/embedding-001`) and LLM (`gemini-1.5-flash`)
+- **Azure OpenAI**: Embeddings and LLM via LangChain
 - **ChromaDB**: Persistent vector storage with collection isolation
 - **LangChain**: RAG pipeline with history-aware retrieval
 
@@ -152,7 +196,10 @@ status = embedding_service.get_build_status(company_id)
 ### Environment Variables
 ```bash
 # Required
-GOOGLE_API_KEY_1="your_key"
+AZURE_OPENAI_API_KEY="your_key"
+AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
+AZURE_OPENAI_DEPLOYMENT="gpt-4o"
+AZURE_OPENAI_API_VERSION="2024-08-01-preview"
 SECRET_KEY="your_secret"
 
 # Optional
@@ -171,7 +218,7 @@ PORT=8000
 
 ### "RAG system not initialized"
 - Check if vector DB exists for the company
-- Verify API keys are configured
+- Verify Azure OpenAI credentials are configured
 - Run build process manually if needed
 
 ### File upload fails

@@ -1,28 +1,36 @@
 
 # FastAPI and web framework dependencies
-fastapi==0.115.0
-uvicorn[standard]==0.30.6
-python-multipart==0.0.10
-jinja2==3.1.4
+fastapi
+uvicorn
+python-multipart
+jinja2
 
 # Core dependencies
-python-dotenv==1.0.1
-pydantic==2.9.2
+python-dotenv
+pydantic
 
 # LangChain and AI dependencies
-langchain==0.3.1
-langchain-chroma==0.1.4
-langchain-google-genai==2.0.0
-google-generativeai==0.8.3
-langchain-community==0.3.1
-langchain-core==0.3.8
+langchain
+langchain-chroma
+langchain-openai
+langchain-community
+langchain-core
+langchain-huggingface
 
 # Vector database
-chromadb==0.5.11
+chromadb
 
 # Document processing packages
-pypdf==5.0.0
-docx2txt==0.8
+pypdf
+docx2txt
+
+# Embedding models (Hugging Face)
+sentence-transformers
+torch
 
 # Additional dependencies for testing and API calls
-requests==2.32.3
+requests
+
+# Development and testing
+pytest
+httpx

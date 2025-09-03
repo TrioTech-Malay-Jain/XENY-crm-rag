@@ -2,6 +2,7 @@
 Embedding service for document processing and vector storage
 """
 import asyncio
+import os
 import re
 from typing import List, Optional
 from datetime import datetime
@@ -9,13 +10,13 @@ from difflib import SequenceMatcher
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import AzureChatOpenAI
 from langchain.chains import create_history_aware_retriever, create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage
 
-from config import CHUNK_SIZE, CHUNK_OVERLAP, LLM_MODEL, get_google_api_keys
+from config import CHUNK_SIZE, CHUNK_OVERLAP, LLM_MODEL, openai_api_key, openai_endpoint, openai_deployment, openai_api_version
 from db.chroma_manager import chroma_manager
 from services.file_service import file_service
 from models.schemas import BuildStatus, BuildStatusEnum
@@ -25,8 +26,6 @@ class EmbeddingService:
     """Service for processing documents and creating embeddings"""
     
     def __init__(self):
-        self.api_keys = get_google_api_keys()
-        self.current_key_index = 0
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=CHUNK_SIZE,
             chunk_overlap=CHUNK_OVERLAP,
@@ -65,21 +64,20 @@ Guidelines:
 Context:
 {{context}}"""
     
-    def get_current_llm(self) -> ChatGoogleGenerativeAI:
-        """Get LLM with current API key"""
-        if not self.api_keys:
-            raise ValueError("No Google API keys available")
-        
-        api_key = self.api_keys[self.current_key_index]
-        return ChatGoogleGenerativeAI(
-            model=LLM_MODEL,
-            google_api_key=api_key
+    def get_current_llm(self) -> AzureChatOpenAI:
+        """Get LLM with Azure configuration"""
+        return AzureChatOpenAI(
+            openai_api_key=openai_api_key,
+            azure_endpoint=openai_endpoint,
+            deployment_name=openai_deployment,
+            openai_api_version=openai_api_version,
+            temperature=1  # gpt-5-mini only supports temperature=1
         )
     
     def rotate_api_key(self):
-        """Rotate to next available API key"""
-        self.current_key_index = (self.current_key_index + 1) % len(self.api_keys)
-        chroma_manager.rotate_api_key()  # Also rotate chroma manager key
+        """Rotate to next available API key (legacy for Google, not needed for Azure)"""
+        # Azure doesn't require key rotation like Google
+        pass
     
     def _get_system_prompt(self, company_id: str, context_source: str = "knowledge base", additional_instructions: str = "") -> str:
         """Generate system prompt with consistent formatting and customizable parameters"""
@@ -467,8 +465,8 @@ Context:
                     
                     response_text = response.get("answer", "")
                     
-                    # Check if we got a meaningful response
-                    if response_text and not ("This information is currently not available" in response_text) and not ("I don't know" in response_text):
+                    # Return the first response we get (less strict filtering)
+                    if response_text:
                         return {
                             "response": response_text,
                             "sources": best_sources,
@@ -481,6 +479,7 @@ Context:
                         
                 except Exception as e:
                     # Continue to next variation
+                    print(f"Query variation failed: {e}")
                     continue
             
             # Return best response found
@@ -529,19 +528,14 @@ Context:
         from langchain.chains import create_history_aware_retriever, create_retrieval_chain
         from langchain.chains.combine_documents import create_stuff_documents_chain
         from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-        from langchain_google_genai import ChatGoogleGenerativeAI
         
-        # Get current API key
-        current_api_key = self.api_keys[self.current_key_index] if self.api_keys else None
-        if not current_api_key:
-            raise ValueError("No Google API key available")
-        
-        # Create LLM
-        llm = ChatGoogleGenerativeAI(
-            model=LLM_MODEL,
-            google_api_key=current_api_key,
-            temperature=0.8,
-            top_p=0.9
+        # Create LLM using Azure
+        llm = AzureChatOpenAI(
+            openai_api_key=openai_api_key,
+            azure_endpoint=openai_endpoint,
+            deployment_name=openai_deployment,
+            openai_api_version=openai_api_version,
+            temperature=1  # gpt-5-mini only supports temperature=1
         )
         
         # Create retriever
@@ -563,16 +557,25 @@ just reformulate it if needed and otherwise return it as is."""
             llm, retriever, contextualize_q_prompt
         )
         
-        # Generate system prompt for file-specific queries
-        file_specific_instructions = "\nFocus on information from the specific document provided in the context."
-        qa_system_prompt = self._get_system_prompt(
-            company_id=company_id if company_id else "the organization",
-            context_source="specific document",
-            additional_instructions=file_specific_instructions
-        )
+        # Generate system prompt for file-specific queries - make it less restrictive
+        file_specific_instructions = "\nAnswer based on information from the document. If you find relevant content, provide a helpful response."
+        
+        # Use a simpler, more permissive prompt for file queries
+        file_qa_system_prompt = f"""You are an AI assistant helping with document analysis for {company_id if company_id else "the organization"}. 
+
+Your task is to answer questions based on the provided document content. 
+
+Guidelines:
+- Use the document content to provide helpful answers
+- Be informative and specific when possible
+- If the exact information isn't in the document, provide related information that might be helpful
+- Focus on being useful rather than overly cautious
+
+Context from document:
+{{context}}"""
         
         qa_prompt = ChatPromptTemplate.from_messages([
-            ("system", qa_system_prompt),
+            ("system", file_qa_system_prompt),
             MessagesPlaceholder("chat_history"),
             ("human", "{input}"),
         ])

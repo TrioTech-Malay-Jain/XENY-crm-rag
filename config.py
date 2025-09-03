@@ -30,29 +30,45 @@ COLLECTION_PREFIX = "company_"
 API_VERSION = "v1"
 API_PREFIX = f"/api/{API_VERSION}"
 
-# Google API settings
-def get_google_api_keys() -> List[str]:
-    """Load all available Google API keys from environment"""
-    api_keys = []
-    i = 1
-    while True:
-        key = os.getenv(f"GOOGLE_API_KEY_{i}")
-        if key:
-            api_keys.append(key)
-            i += 1
-        else:
-            break
+# # Google API settings
+# def get_google_api_keys() -> List[str]:
+#     """Load all available Google API keys from environment"""
+#     api_keys = []
+#     i = 1
+#     while True:
+#         key = os.getenv(f"GOOGLE_API_KEY_{i}")
+#         if key:
+#             api_keys.append(key)
+#             i += 1
+#         else:
+#             break
     
-    # Fallback to single key
-    if not api_keys:
-        single_key = os.getenv("GOOGLE_API_KEY")
-        if single_key:
-            api_keys.append(single_key)
+#     # Fallback to single key
+#     if not api_keys:
+#         single_key = os.getenv("GOOGLE_API_KEY")
+#         if single_key:
+#             api_keys.append(single_key)
     
-    # Debug print
-    print(f"🔑 Found {len(api_keys)} Google API keys")
+#     # Debug print
+#     print(f"🔑 Found {len(api_keys)} Google API keys")
     
-    return api_keys
+#     return api_keys
+
+openai_api_key = os.getenv("AZURE_OPENAI_API_KEY")
+openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+openai_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT")
+openai_api_version = os.getenv("AZURE_OPENAI_API_VERSION")
+
+# Separate deployment for embeddings
+openai_embedding_deployment = os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-ada-002")
+
+# Embedding provider settings
+USE_HF_EMBEDDINGS = os.getenv("USE_HF_EMBEDDINGS", "false").lower() == "true"
+HF_EMBEDDING_MODEL = os.getenv("HF_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+
+# Embedding provider settings
+USE_HF_EMBEDDINGS = os.getenv("USE_HF_EMBEDDINGS", "false").lower() == "true"
+HF_EMBEDDING_MODEL = os.getenv("HF_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 
 # Embedding model settings
 EMBEDDING_MODEL = "models/embedding-001"

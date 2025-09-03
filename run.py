@@ -27,13 +27,12 @@ async def lifespan(app: FastAPI):
     os.makedirs(KNOWLEDGE_BASE_DIR, exist_ok=True)
     os.makedirs(CHROMA_DB_PATH, exist_ok=True)
     
-    # Check API keys
-    from config import get_google_api_keys
-    api_keys = get_google_api_keys()
-    if not api_keys:
-        print("⚠️  Warning: No Google API keys found. Set GOOGLE_API_KEY_1 environment variable.")
+    # Check Azure OpenAI configuration
+    from config import openai_api_key, openai_endpoint
+    if not openai_api_key or not openai_endpoint:
+        print("⚠️  Warning: Azure OpenAI not configured. Set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT environment variables.")
     else:
-        print(f"✅ Loaded {len(api_keys)} Google API keys")
+        print("✅ Azure OpenAI configuration loaded")
     
     # List existing companies
     from db.chroma_manager import chroma_manager
@@ -118,11 +117,10 @@ async def home(request: Request):
 @app.get("/api/v1/health", response_model=HealthCheck)
 async def health_check():
     """Health check endpoint"""
-    from config import get_google_api_keys
+    from config import openai_api_key
     from services.embedding_service import embedding_service
     from db.chroma_manager import chroma_manager
     
-    api_keys = get_google_api_keys()
     companies = chroma_manager.list_company_collections()
     
     return HealthCheck(
@@ -130,7 +128,7 @@ async def health_check():
         version="2.0.0",
         rag_initialized=len(embedding_service._rag_chains) > 0,
         companies_loaded=len(companies),
-        api_keys_available=len(api_keys),
+        api_keys_available=1 if openai_api_key else 0,
         timestamp=datetime.now()
     )
 
