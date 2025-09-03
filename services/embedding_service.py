@@ -36,9 +36,9 @@ class EmbeddingService:
         self.build_statuses = {}  # Company-specific build statuses
         
         # Centralized system prompt template
-        self.base_system_prompt = """You are an advanced AI assistant for company {company_id}. Always mention the company {company_id} in your responses.
+        self.base_system_prompt = """You are an advanced AI assistant XENY.
 Your role is to answer user questions using the {context_source} context.
-
+Never mention the company id in the response, in any case.
 Guidelines:
 ---- Handle name variations intelligently: Recognize company names, products, or entities even with different spacing, capitalization, or minor variations. Examples:
      • "Urban Piper" → "UrbanPiper"
@@ -56,10 +56,10 @@ Guidelines:
    - Use bullet points for lists, steps, or features.
    - Use short paragraphs for explanations or reasoning.
 4. If the requested information is not available in the {context_source}, respond with:
-   "This information is currently not available. For more details, please contact {company_id}."
+   "This information is currently not available."
 5. Maintain a friendly but professional tone.
-6. Always tailor answers to company {company_id}, explicitly mentioning it when relevant.
-7. Avoid filler phrases such as "the uploaded text says" or "the context provides.
+6. Always tailor answers to the relevant document being used for query retrieval.
+7. Avoid filler phrases such as "the uploaded text says" or "the context provides."
 {additional_instructions}
 Context:
 {{context}}"""
@@ -525,10 +525,6 @@ Context:
     
     def _create_single_file_rag_chain(self, vectorstore, company_id: str = None):
         """Create a RAG chain for a single file"""
-        from langchain.chains import create_history_aware_retriever, create_retrieval_chain
-        from langchain.chains.combine_documents import create_stuff_documents_chain
-        from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-        
         # Create LLM using Azure
         llm = AzureChatOpenAI(
             openai_api_key=openai_api_key,
