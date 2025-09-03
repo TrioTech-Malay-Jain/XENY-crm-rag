@@ -6,7 +6,7 @@ from typing import Dict, List
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
 
-from models.schemas import QueryRequest, QueryResponse, ChatMessage, FileChatRequest
+from models.schemas import QueryRequest, CompanyQueryRequest, QueryResponse, ChatMessage, FileChatRequest
 from services.embedding_service import embedding_service
 from services.file_service import file_service
 
@@ -17,7 +17,7 @@ chat_sessions: Dict[str, List[ChatMessage]] = {}
 
 
 @router.post("/", response_model=QueryResponse)
-async def query_documents(request: QueryRequest):
+async def query_documents(request: CompanyQueryRequest):
     """Query documents for a specific company"""
     
     try:
@@ -45,7 +45,7 @@ async def query_documents(request: QueryRequest):
 
 
 @router.post("/chat", response_model=QueryResponse)
-async def chat_with_documents(request: QueryRequest):
+async def chat_with_documents(request: CompanyQueryRequest):
     """Chat with documents for a specific company"""
     
     try:

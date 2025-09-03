@@ -1,6 +1,7 @@
 """
 Multi-organizational RAG system - Main FastAPI application
 """
+import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -93,30 +94,6 @@ async def simple_health_check():
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    """Serve the main interface"""
-    if TEMPLATES_DIR.exists() and (TEMPLATES_DIR / "index.html").exists():
-        return templates.TemplateResponse("index.html", {"request": request})
-    else:
-        return HTMLResponse("""
-        <html>
-            <head><title>Multi-Organizational RAG System</title></head>
-            <body>
-                <h1>Multi-Organizational RAG System</h1>
-                <p>API is running. Visit <a href="/docs">/docs</a> for API documentation.</p>
-                <h2>Quick Start:</h2>
-                <ol>
-                    <li>Create a company: POST /api/v1/companies/</li>
-                    <li>Upload files: POST /api/v1/files/upload</li>
-                    <li>Build database: POST /api/v1/companies/{company_id}/build</li>
-                    <li>Query documents: POST /api/v1/query/</li>
-                </ol>
-            </body>
-        </html>
-        """)
-
-
-@app.get("/admin", response_class=HTMLResponse)
-async def admin_panel(request: Request):
     """Serve the admin panel"""
     if TEMPLATES_DIR.exists() and (TEMPLATES_DIR / "admin.html").exists():
         return templates.TemplateResponse("admin.html", {"request": request})
@@ -159,7 +136,6 @@ async def health_check():
 
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(
         "run:app",
         host=HOST,

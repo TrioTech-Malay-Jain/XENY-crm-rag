@@ -2,8 +2,10 @@
 Embedding service for document processing and vector storage
 """
 import asyncio
+import re
 from typing import List, Optional
 from datetime import datetime
+from difflib import SequenceMatcher
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
@@ -33,6 +35,35 @@ class EmbeddingService:
         )
         self._rag_chains = {}  # Company-specific RAG chains
         self.build_statuses = {}  # Company-specific build statuses
+        
+        # Centralized system prompt template
+        self.base_system_prompt = """You are an advanced AI assistant for company {company_id}. Always mention the company {company_id} in your responses.
+Your role is to answer user questions using the {context_source} context.
+
+Guidelines:
+---- Handle name variations intelligently: Recognize company names, products, or entities even with different spacing, capitalization, or minor variations. Examples:
+     • "Urban Piper" → "UrbanPiper"
+     • "Trio Tech" → "TrioTech" 
+     • "urban piper" → "UrbanPiper"
+     • "URBANPIPER" → "UrbanPiper"
+---- Apply fuzzy matching: If a user asks about something similar to what's in your knowledge base, provide the closest relevant information.
+---- Query examples with variations:
+     • User: "What is UrbanPiper?" → Provide UrbanPiper information
+     • User: "What is Urban Piper?" → Provide the same UrbanPiper information
+     • User: "Tell me about trio tech" → Provide TrioTech information
+1. Use only the {context_source} to generate answers. Do not mention or describe the documents or context explicitly.
+2. Provide responses that are concise yet slightly expanded for clarity. 
+3. Adapt answer style dynamically:
+   - Use bullet points for lists, steps, or features.
+   - Use short paragraphs for explanations or reasoning.
+4. If the requested information is not available in the {context_source}, respond with:
+   "This information is currently not available. For more details, please contact {company_id}."
+5. Maintain a friendly but professional tone.
+6. Always tailor answers to company {company_id}, explicitly mentioning it when relevant.
+7. Avoid filler phrases such as "the uploaded text says" or "the context provides.
+{additional_instructions}
+Context:
+{{context}}"""
     
     def get_current_llm(self) -> ChatGoogleGenerativeAI:
         """Get LLM with current API key"""
@@ -49,6 +80,75 @@ class EmbeddingService:
         """Rotate to next available API key"""
         self.current_key_index = (self.current_key_index + 1) % len(self.api_keys)
         chroma_manager.rotate_api_key()  # Also rotate chroma manager key
+    
+    def _get_system_prompt(self, company_id: str, context_source: str = "knowledge base", additional_instructions: str = "") -> str:
+        """Generate system prompt with consistent formatting and customizable parameters"""
+        return self.base_system_prompt.format(
+            company_id=company_id,
+            context_source=context_source,
+            additional_instructions=additional_instructions
+        )
+    
+    def _preprocess_query(self, query: str, company_id: str) -> List[str]:
+        """Preprocess query to handle name variations and generate multiple search attempts"""
+        query_variations = [query]  # Original query
+        
+        # Common company name variations to normalize
+        name_normalizations = {
+            'urban piper': 'UrbanPiper',
+            'urbanpiper': 'UrbanPiper', 
+            'trio tech': 'TrioTech',
+            'triotech': 'TrioTech',
+            'urban-piper': 'UrbanPiper',
+            'trio-tech': 'TrioTech'
+        }
+        
+        # Create variations by normalizing company names in the query
+        query_lower = query.lower()
+        normalized_query = query
+        
+        for variant, normalized in name_normalizations.items():
+            if variant in query_lower:
+                normalized_query = re.sub(re.escape(variant), normalized, query, flags=re.IGNORECASE)
+                if normalized_query != query:
+                    query_variations.append(normalized_query)
+        
+        # Add company_id specific variations
+        if company_id:
+            # Replace company name variations with the actual company_id
+            company_variations = [
+                query.replace('Urban Piper', company_id),
+                query.replace('urban piper', company_id),
+                query.replace('URBAN PIPER', company_id),
+                query.replace('Trio Tech', company_id),
+                query.replace('trio tech', company_id),
+                query.replace('TRIO TECH', company_id)
+            ]
+            
+            for variation in company_variations:
+                if variation != query and variation not in query_variations:
+                    query_variations.append(variation)
+        
+        # Add generic variations
+        query_variations.extend([
+            query.replace(' ', ''),  # Remove spaces
+            query.replace('-', ' '), # Replace hyphens with spaces
+            query.replace('_', ' ')  # Replace underscores with spaces
+        ])
+        
+        # Remove duplicates while preserving order
+        unique_variations = []
+        seen = set()
+        for q in query_variations:
+            if q not in seen:
+                unique_variations.append(q)
+                seen.add(q)
+        
+        return unique_variations
+    
+    def _similarity_score(self, a: str, b: str) -> float:
+        """Calculate similarity between two strings"""
+        return SequenceMatcher(None, a.lower(), b.lower()).ratio()
     
     async def process_company_documents(self, company_id: str) -> BuildStatus:
         """Process all documents for a company and build vector store"""
@@ -157,24 +257,12 @@ class EmbeddingService:
                 llm, retriever, contextualize_q_prompt
             )
             
-            # System prompt
-            system_prompt = f"""You are an advanced AI assistant for company {company_id}. Always mention the company {company_id} in your responses.
-Your role is to answer user questions using the knowledge base context.
-
-Guidelines:
-1. Use only the knowledge base to generate answers. Do not mention or describe the documents or context explicitly.
-2. Provide responses that are concise yet slightly expanded for clarity. 
-3. Adapt answer style dynamically:
-   - Use bullet points for lists, steps, or features.
-   - Use short paragraphs for explanations or reasoning.
-4. If the requested information is not available in the knowledge base, respond with:
-   "This information is currently not available. For more details, please contact [insert company contact info if available]."
-5. Maintain a friendly but professional tone.
-6. Always tailor answers to company {company_id}, explicitly mentioning it when relevant.
-7. Avoid filler phrases such as "the uploaded text says" or "the context provides."
-
-Context:
-{{context}}"""
+            # Generate system prompt for company-wide queries
+            system_prompt = self._get_system_prompt(
+                company_id=company_id,
+                context_source="knowledge base",
+                additional_instructions=""
+            )
             
             qa_prompt = ChatPromptTemplate.from_messages([
                 ("system", system_prompt),
@@ -193,7 +281,7 @@ Context:
             return None
     
     async def query_company(self, company_id: str, query: str, chat_history: List[dict] = None) -> dict:
-        """Query documents for a specific company"""
+        """Query documents for a specific company with fuzzy matching"""
         
         # Check if RAG chain exists
         if company_id not in self._rag_chains:
@@ -213,34 +301,91 @@ Context:
                 else:
                     chat_history_for_chain.append(AIMessage(content=content))
         
-        try:
-            # Query the RAG chain
-            response = self._rag_chains[company_id].invoke({
-                "input": query,
-                "chat_history": chat_history_for_chain
-            })
-            
-            # Extract sources
-            sources = []
-            if 'context' in response:
-                for doc in response['context']:
-                    if 'source' in doc.metadata:
-                        sources.append(doc.metadata['source'])
-            
+        # Generate query variations for better retrieval
+        query_variations = self._preprocess_query(query, company_id)
+        
+        best_response = None
+        best_sources = []
+        
+        # Try each query variation until we get a meaningful response
+        for q_variant in query_variations:
+            try:
+                # Query the RAG chain
+                response = self._rag_chains[company_id].invoke({
+                    "input": q_variant,
+                    "chat_history": chat_history_for_chain
+                })
+                
+                response_text = response.get("answer", "")
+                
+                # Check if we got a meaningful response (not the "not available" message)
+                if response_text and not ("This information is currently not available" in response_text):
+                    # Extract sources
+                    sources = []
+                    if 'context' in response:
+                        for doc in response['context']:
+                            if 'source' in doc.metadata:
+                                sources.append(doc.metadata['source'])
+                    
+                    return {
+                        "response": response_text,
+                        "sources": list(set(sources))  # Remove duplicates
+                    }
+                elif not best_response:
+                    # Keep the first response as fallback
+                    sources = []
+                    if 'context' in response:
+                        for doc in response['context']:
+                            if 'source' in doc.metadata:
+                                sources.append(doc.metadata['source'])
+                    
+                    best_response = response_text
+                    best_sources = list(set(sources))
+                    
+            except Exception as e:
+                # Continue to next variation
+                continue
+        
+        # If no meaningful response found, return the best fallback
+        if best_response:
             return {
-                "response": response.get("answer", "I couldn't find an answer to that."),
-                "sources": list(set(sources))  # Remove duplicates
+                "response": best_response,
+                "sources": best_sources
             }
-            
-        except Exception as e:
-            # Try rotating API key and retry once
+        
+        # Last resort - try rotating API key and retry with original query
+        try:
             self.rotate_api_key()
             
             # Remove the failed RAG chain
             if company_id in self._rag_chains:
                 del self._rag_chains[company_id]
+                
+            # Recreate RAG chain and try once more
+            rag_chain = await self._create_rag_chain(company_id)
+            if rag_chain:
+                self._rag_chains[company_id] = rag_chain
+                response = self._rag_chains[company_id].invoke({
+                    "input": query,
+                    "chat_history": chat_history_for_chain
+                })
+                
+                sources = []
+                if 'context' in response:
+                    for doc in response['context']:
+                        if 'source' in doc.metadata:
+                            sources.append(doc.metadata['source'])
+                
+                return {
+                    "response": response.get("answer", "I couldn't find an answer to that."),
+                    "sources": list(set(sources))
+                }
             
-            raise Exception(f"Query failed: {str(e)}")
+        except Exception as e:
+            pass
+        
+        # Final fallback
+        raise Exception(f"Query failed: Unable to process query after trying multiple variations")
     
     async def query_specific_file(self, company_id: str, file_id: str, query: str, chat_history: List[dict] = None) -> dict:
         """Query a specific file for a company"""
@@ -305,18 +450,43 @@ Context:
                     else:
                         chat_history_for_chain.append(AIMessage(content=content))
             
-            # Query the RAG chain
-            response = rag_chain.invoke({
-                "input": query,
-                "chat_history": chat_history_for_chain
-            })
+            # Generate query variations for better retrieval
+            query_variations = self._preprocess_query(query, company_id)
             
-            # Extract sources
-            sources = [f"{company_id}/{file_info.filename}"]
+            best_response = None
+            best_sources = [f"{company_id}/{file_info.filename}"]
             
+            # Try each query variation until we get a meaningful response
+            for q_variant in query_variations:
+                try:
+                    # Query the RAG chain
+                    response = rag_chain.invoke({
+                        "input": q_variant,
+                        "chat_history": chat_history_for_chain
+                    })
+                    
+                    response_text = response.get("answer", "")
+                    
+                    # Check if we got a meaningful response
+                    if response_text and not ("This information is currently not available" in response_text) and not ("I don't know" in response_text):
+                        return {
+                            "response": response_text,
+                            "sources": best_sources,
+                            "file_id": file_id,
+                            "filename": file_info.original_filename or file_info.filename
+                        }
+                    elif not best_response:
+                        # Keep the first response as fallback
+                        best_response = response_text
+                        
+                except Exception as e:
+                    # Continue to next variation
+                    continue
+            
+            # Return best response found
             return {
-                "response": response.get("answer", "I couldn't find an answer to that in the specified document."),
-                "sources": sources,
+                "response": best_response or "I couldn't find an answer to that in the specified document.",
+                "sources": best_sources,
                 "file_id": file_id,
                 "filename": file_info.original_filename or file_info.filename
             }
@@ -370,7 +540,8 @@ Context:
         llm = ChatGoogleGenerativeAI(
             model=LLM_MODEL,
             google_api_key=current_api_key,
-            temperature=0.3
+            temperature=0.8,
+            top_p=0.9
         )
         
         # Create retriever
@@ -392,14 +563,13 @@ just reformulate it if needed and otherwise return it as is."""
             llm, retriever, contextualize_q_prompt
         )
         
-        # QA prompt with company context
-        company_context = f" for company {company_id}" if company_id else ""
-        qa_system_prompt = f"""You are an AI assistant{company_context}. \
-Use the following pieces of retrieved context to answer the question. \
-If you don't know the answer, just say that you don't know. \
-Keep the answer concise but comprehensive.{' Always mention the company ' + company_id + ' when relevant.' if company_id else ''}
-
-{{context}}"""
+        # Generate system prompt for file-specific queries
+        file_specific_instructions = "\nFocus on information from the specific document provided in the context."
+        qa_system_prompt = self._get_system_prompt(
+            company_id=company_id if company_id else "the organization",
+            context_source="specific document",
+            additional_instructions=file_specific_instructions
+        )
         
         qa_prompt = ChatPromptTemplate.from_messages([
             ("system", qa_system_prompt),

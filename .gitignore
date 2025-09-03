@@ -42,3 +42,6 @@ run_fastapi.py
 
 # Private documentation
 understanding.md
+
+# Temporary files
+copy_utils.py

@@ -1,204 +1,454 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cloud Community Day - AI Guide</title>
-    <link rel="icon" href="https://ccd.bhopal.dev/favicon.ico" type="image/x-icon" />
-    <link rel="shortcut icon" href="https://ccd.bhopal.dev/favicon.ico" type="image/x-icon" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - ttRag</title>
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        .chat-message {
-            max-width: 85%;
-            padding: 0.75rem 1.25rem;
-            border-radius: 1.25rem;
-            margin-bottom: 0.5rem;
-            line-height: 1.5;
-            word-wrap: break-word;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        .user-message {
-            background: linear-gradient(to right, #fb923c, #f97316);
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .admin-header {
+            background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
             color: white;
-            align-self: flex-end;
-            border-bottom-right-radius: 0.25rem;
+            padding: 30px;
+            text-align: center;
+            position: relative;
         }
-        .bot-message {
-            background: #ffffff;
-            color: #1e2b3b;
-            align-self: flex-start;
-            border-bottom-left-radius: 0.25rem;
-            border: 1px solid #e2e8f0;
+
+        .admin-header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
         }
-        .bot-message a { color: #2563eb; text-decoration: underline; font-weight: 600; }
-        .bot-message ul { list-style-type: disc; padding-left: 1.5rem; margin-top: 0.5rem; margin-bottom: 0.5rem; }
-        .bot-message strong { color: #1d4ed8; }
-        .bot-message p { margin-bottom: 0.5rem; }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .back-link {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 25px;
+            transition: background 0.3s;
+        }
+
+        .back-link:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .admin-content {
+            padding: 40px;
+        }
+
+        .admin-section {
+            margin-bottom: 40px;
+            padding: 30px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 5px solid #4285f4;
+        }
+
+        .admin-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .upload-area {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        input[type="file"] {
+            padding: 10px;
+            border: 2px dashed #4285f4;
+            border-radius: 8px;
+            background: white;
+            flex: 1;
+            min-width: 250px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(66, 133, 244, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .delete-btn {
+            background: linear-gradient(135deg, #ea4335 0%, #dc3545 100%);
+            padding: 8px 16px;
+            font-size: 0.9em;
+        }
+
+        .delete-btn:hover {
+            box-shadow: 0 5px 15px rgba(234, 67, 53, 0.3);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        #uploadStatus, #buildStatus {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            background: white;
+            border: 1px solid #e9ecef;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .status-message {
+            margin: 5px 0;
+            padding: 8px 12px;
+            border-radius: 5px;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4285f4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .file-info {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .no-files {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 40px;
+        }
     </style>
 </head>
-<body class="bg-gray-100 flex flex-col h-screen">
-    <!-- Header -->
-    <header class="w-full flex items-center justify-between px-6 py-3 bg-gradient-to-r from-orange-400 via-green-400 to-blue-500 shadow-md z-10">
-        <img src="https://ccd.bhopal.dev/logo.png" alt="Cloud Community Day Logo" class="h-10 w-auto" />
-        <a href="https://ccd.bhopal.dev/" target="_blank" class="text-white font-semibold bg-green-400 hover:bg-green-500 px-4 py-2 rounded-lg shadow transition-transform hover:scale-105">Official Site</a>
-    </header>
+<body>
+    <div class="admin-container">
+        <div class="admin-header">
+            <a href="/" class="back-link">← Back to Chat</a>
+            <h1>Knowledge Base Management</h1>
+            <p>Manage your AI assistant's knowledge base</p>
+        </div>
 
-    <!-- Main Chat Container -->
-    <main class="flex-1 p-4 overflow-hidden">
-        <div class="w-full max-w-3xl h-full mx-auto bg-white shadow-2xl flex flex-col rounded-lg">
-            <div id="chat-messages" class="flex-1 p-6 space-y-4 overflow-y-auto flex flex-col">
-                <!-- Chat history will be loaded here -->
+        <div class="admin-content">
+            <!-- Upload Section -->
+            <div class="admin-section">
+                <h2>📁 Upload Knowledge Base Files</h2>
+                <p class="file-info">Upload .txt, .json, .pdf, or .docx files to expand the knowledge base</p>
+                <div class="upload-area">
+                    <input type="file" id="fileInput" accept=".txt,.json,.pdf,.docx" multiple>
+                    <button id="uploadButton">Upload Files</button>
+                </div>
+                <div id="uploadStatus"></div>
             </div>
 
-            <div class="p-4 bg-gray-100 border-t border-gray-200 rounded-b-lg">
-                <!-- Suggestion Chips -->
-                <div class="flex items-center gap-2 overflow-x-auto pb-3 hide-scrollbar">
-                    <span class="text-sm font-bold text-gray-500 whitespace-nowrap">✨ Try:</span>
-                    <button class="suggestion-chip bg-gray-200 hover:bg-gray-300 text-xs text-gray-700 font-semibold py-1 px-3 rounded-full transition whitespace-nowrap">
-                      Who are the speakers?
-                  </button>
-                  <button class="suggestion-chip bg-gray-200 hover:bg-gray-300 text-xs text-gray-700 font-semibold py-1 px-3 rounded-full transition whitespace-nowrap">
-                      What is the agenda?
-                  </button>
-                  <button class="suggestion-chip bg-gray-200 hover:bg-gray-300 text-xs text-gray-700 font-semibold py-1 px-3 rounded-full transition whitespace-nowrap">
-                      How is it beneficial for me as a student?
-                  </button>
-                  <button class="suggestion-chip bg-gray-200 hover:bg-gray-300 text-xs text-gray-700 font-semibold py-1 px-3 rounded-full transition whitespace-nowrap">
-                      What is are the technologies we will be discussing about?
-                  </button>
-                  <button class="suggestion-chip bg-gray-200 hover:bg-gray-300 text-xs text-gray-700 font-semibold py-1 px-3 rounded-full transition whitespace-nowrap">
-                      Will there be food?
-                  </button>
-                  <button class="suggestion-chip bg-gray-200 hover:bg-gray-300 text-xs text-gray-700 font-semibold py-1 px-3 rounded-full transition whitespace-nowrap">
-                      What is meant by networking?
-                  </button>
-                </div>
+            <!-- Files List Section -->
+            <div class="admin-section">
+                <h2>📋 Knowledge Base Files</h2>
+                <button id="refreshFiles">🔄 Refresh List</button>
+                <div id="filesList"></div>
+            </div>
 
-                <!-- Input Form -->
-                <form id="chat-form" class="flex items-center">
-                    <input type="text" id="chat-input" placeholder="Ask 'How will this event help me?'" class="flex-1 bg-white border border-gray-300 text-gray-800 rounded-l-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-5 rounded-r-lg">Send</button>
-                </form>
-
-                <!-- Location -->
-                <div class="text-center mt-3">
-                    <a href="https://maps.app.goo.gl/1qNi4KHQiivgESWt8" target="_blank" class="text-xs text-blue-800 bg-yellow-200 px-3 py-1 rounded-full shadow hover:bg-yellow-300 transition font-semibold">
-                        📍 Location: Minto Hall, Bhopal
-                    </a>
-                </div>
+            <!-- Build Database Section -->
+            <div class="admin-section">
+                <h2>🔧 Vector Database</h2>
+                <p class="file-info">Rebuild the vector database after uploading new files</p>
+                <button id="buildDatabase">🚀 Build/Rebuild Database</button>
+                <div id="buildStatus"></div>
             </div>
         </div>
-    </main>
+    </div>
 
-    <!-- Footer -->
-      
-    <!-- Script Logic -->
     <script>
-        const renderer = new marked.Renderer();
-        renderer.link = function(href, title, text) {
-            return `<a target="_blank" href="${href}" title="${title || ''}">${text}</a>`;
-        };
-        marked.setOptions({ renderer });
-
-        const chatForm = document.getElementById('chat-form');
-        const chatInput = document.getElementById('chat-input');
-        const chatMessages = document.getElementById('chat-messages');
-        const suggestionChips = document.querySelectorAll('.suggestion-chip');
-
-        let sessionId = localStorage.getItem('sessionId');
-        if (!sessionId) {
-            sessionId = crypto.randomUUID();
-            localStorage.setItem('sessionId', sessionId);
-        }
-
-        let chatHistory = [];
-
-        // Function to add a message to the chat window
-        function addMessage(text, sender) {
-            const msg = document.createElement('div');
-            msg.className = `chat-message ${sender}-message`;
-            if (sender === 'bot') {
-                msg.innerHTML = marked.parse(text);
-            } else {
-                msg.textContent = text;
+        // Upload functionality
+        document.getElementById('uploadButton').addEventListener('click', async function() {
+            const fileInput = document.getElementById('fileInput');
+            const files = fileInput.files;
+            const uploadStatus = document.getElementById('uploadStatus');
+            
+            if (files.length === 0) {
+                uploadStatus.innerHTML = '<div class="status-message error">Please select files to upload</div>';
+                return;
             }
-            chatMessages.appendChild(msg);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        // Function to show the typing indicator
-        function addTypingIndicator() {
-            const typing = document.createElement('div');
-            typing.id = 'typing-indicator';
-            typing.className = 'chat-message bot-message';
-            typing.innerHTML = '<span class="animate-pulse">● ● ●</span>';
-            chatMessages.appendChild(typing);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        // Function to remove the typing indicator
-        function removeTypingIndicator() {
-            const typing = document.getElementById('typing-indicator');
-            if (typing) typing.remove();
-        }
-        
-        // Function to handle form submission
-        async function handleFormSubmit(e) {
-            e.preventDefault();
-            const message = chatInput.value.trim();
-            if (!message) return;
-
-            addMessage(message, 'user');
-            chatHistory.push({ sender: 'user', message });
-            chatInput.value = '';
-            addTypingIndicator();
-
-            try {
-                // Use a relative path, which works for both local and deployed environments
-                const response = await fetch('/ask', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message,
-                        session_id: sessionId,
-                        history: chatHistory.slice(-8) // Send recent history for context
-                    })
-                });
-
-                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+            
+            uploadStatus.innerHTML = '<div class="status-message info"><span class="loading"></span>Uploading files...</div>';
+            
+            for (let file of files) {
+                const formData = new FormData();
+                formData.append('file', file);
                 
-                const data = await response.json();
-                removeTypingIndicator();
-                addMessage(data.reply, 'bot');
-                chatHistory.push({ sender: 'bot', message: data.reply });
+                try {
+                    const response = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        uploadStatus.innerHTML += 
+                            `<div class="status-message success">✓ ${result.filename} uploaded successfully (${formatFileSize(result.size)})</div>`;
+                    } else {
+                        uploadStatus.innerHTML += 
+                            `<div class="status-message error">✗ Error uploading ${file.name}: ${result.detail}</div>`;
+                    }
+                } catch (error) {
+                    uploadStatus.innerHTML += 
+                        `<div class="status-message error">✗ Error uploading ${file.name}: ${error.message}</div>`;
+                }
+            }
+            
+            // Clear file input and refresh files list
+            fileInput.value = '';
+            loadFilesList();
+        });
 
+        // Load files list
+        async function loadFilesList() {
+            const filesList = document.getElementById('filesList');
+            
+            try {
+                filesList.innerHTML = '<div class="status-message info"><span class="loading"></span>Loading files...</div>';
+                
+                const response = await fetch('/api/files');
+                const files = await response.json();
+                
+                filesList.innerHTML = '';
+                
+                if (files.length === 0) {
+                    filesList.innerHTML = '<div class="no-files">No files uploaded yet. Upload some knowledge base files to get started!</div>';
+                    return;
+                }
+                
+                const table = document.createElement('table');
+                table.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th>📄 Filename</th>
+                            <th>📏 Size</th>
+                            <th>📅 Created</th>
+                            <th>⚡ Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                `;
+                
+                const tbody = table.querySelector('tbody');
+                
+                files.forEach(file => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>
+                            <strong>${file.filename}</strong>
+                            <br><small style="color: #666;">${file.extension.toUpperCase()} file</small>
+                        </td>
+                        <td>${formatFileSize(file.size)}</td>
+                        <td>${new Date(file.created_at).toLocaleString()}</td>
+                        <td>
+                            <button onclick="deleteFile('${file.filename}')" class="delete-btn">🗑️ Delete</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+                
+                filesList.appendChild(table);
             } catch (error) {
-                removeTypingIndicator();
-                addMessage("Sorry, something went wrong. Please try again.", 'bot');
-                console.error("Chatbot Error:", error);
+                filesList.innerHTML = 
+                    `<div class="status-message error">Error loading files: ${error.message}</div>`;
             }
         }
 
-        // Add event listeners
-        chatForm.addEventListener('submit', handleFormSubmit);
+        // Delete file
+        async function deleteFile(filename) {
+            if (!confirm(`Are you sure you want to delete "${filename}"?\n\nThis action cannot be undone.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/files/${filename}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert('✓ File deleted successfully');
+                    loadFilesList();
+                } else {
+                    alert(`✗ Error deleting file: ${result.detail}`);
+                }
+            } catch (error) {
+                alert(`✗ Error deleting file: ${error.message}`);
+            }
+        }
 
-        suggestionChips.forEach(chip => {
-            chip.addEventListener('click', () => {
-                const text = chip.textContent.trim();
-                chatInput.value = text;
-                chatForm.dispatchEvent(new Event('submit'));
-            });
+        // Build database
+        document.getElementById('buildDatabase').addEventListener('click', async function() {
+            const buildStatus = document.getElementById('buildStatus');
+            
+            try {
+                buildStatus.innerHTML = '<div class="status-message info"><span class="loading"></span>Starting database build...</div>';
+                
+                const response = await fetch('/api/build_db', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                buildStatus.innerHTML = 
+                    `<div class="status-message info">${result.message}</div>`;
+                
+                // Poll for status updates
+                if (result.status === 'building') {
+                    checkBuildStatus();
+                }
+            } catch (error) {
+                buildStatus.innerHTML = 
+                    `<div class="status-message error">Error: ${error.message}</div>`;
+            }
         });
-        
-        // Add the initial welcome message when the page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            addMessage("Hi! I'm the official AI Guide for GCCD Bhopal. Ask me anything about the event!", 'bot');
-        });
+
+        // Check build status
+        async function checkBuildStatus() {
+            try {
+                const response = await fetch('/api/build_status');
+                const status = await response.json();
+                
+                const buildStatus = document.getElementById('buildStatus');
+                
+                if (status.status === 'building') {
+                    buildStatus.innerHTML = 
+                        `<div class="status-message info"><span class="loading"></span>Status: ${status.status} - ${status.message}</div>`;
+                    setTimeout(checkBuildStatus, 2000);
+                } else if (status.status === 'completed') {
+                    buildStatus.innerHTML = 
+                        `<div class="status-message success">✓ ${status.message}</div>`;
+                } else if (status.status === 'error') {
+                    buildStatus.innerHTML = 
+                        `<div class="status-message error">✗ ${status.message}</div>`;
+                } else {
+                    buildStatus.innerHTML = 
+                        `<div class="status-message info">Status: ${status.status} - ${status.message || 'Ready'}</div>`;
+                }
+            } catch (error) {
+                console.error('Error checking build status:', error);
+            }
+        }
+
+        // Utility functions
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Refresh files list
+        document.getElementById('refreshFiles').addEventListener('click', loadFilesList);
+
+        // Load files list and check build status on page load
+        loadFilesList();
+        checkBuildStatus();
+
+        // Auto-refresh build status every 30 seconds if building
+        setInterval(async () => {
+            try {
+                const response = await fetch('/api/build_status');
+                const status = await response.json();
+                if (status.status === 'building') {
+                    checkBuildStatus();
+                }
+            } catch (error) {
+                console.error('Error in auto-refresh:', error);
+            }
+        }, 30000);
     </script>
 </body>
 </html>

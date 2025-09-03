@@ -40,6 +40,13 @@ class QueryRequest(BaseModel):
     history: Optional[List[Dict[str, str]]] = []
     max_results: Optional[int] = 5
 
+class CompanyQueryRequest(BaseModel):
+    query: str = Field(..., description="The question to ask")
+    company_id: str = Field(..., description="Company ID for data isolation")
+    session_id: Optional[str] = None
+    history: Optional[List[Dict[str, str]]] = []
+    max_results: Optional[int] = 5
+
 class FileChatRequest(BaseModel):
     query: str = Field(..., description="The question to ask")
     file_id: str = Field(..., description="File ID to chat with")
