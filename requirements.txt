@@ -7,9 +7,11 @@ openai
 
 # LangChain ecosystem (Azure + HF; no Google GenAI)
 langchain
+langchain-core
 langchain-community
 langchain-openai
 langchain-huggingface
+langchain-chroma
 sentence-transformers
 pydantic
 
