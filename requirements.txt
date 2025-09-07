@@ -1,36 +1,35 @@
+# Core dependencies
+unstructured
+tiktoken
+pinecone
+pypdf
+openai
 
-# FastAPI and web framework dependencies
+# LangChain ecosystem (Azure + HF; no Google GenAI)
+langchain
+langchain-community
+langchain-openai
+langchain-huggingface
+sentence-transformers
+pydantic
+
+# Data handling
+pandas
+numpy
+
+# Utilities
+python-dotenv
+
+# FastAPI and server
 fastapi
 uvicorn
 python-multipart
 jinja2
 
-# Core dependencies
-python-dotenv
-pydantic
-
-# LangChain and AI dependencies
-langchain
-langchain-chroma
-langchain-openai
-langchain-community
-langchain-core
-langchain-huggingface
-
-# Vector database
-chromadb
-
-# Document processing packages
-pypdf
+# Document processing
 docx2txt
-
-# Embedding models (Hugging Face)
-sentence-transformers
-torch
-
-# Additional dependencies for testing and API calls
-requests
 
 # Development and testing
 pytest
 httpx
+requests
