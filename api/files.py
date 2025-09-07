@@ -5,6 +5,7 @@ from typing import List, Dict, Any
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 import os
+import logging
 from pathlib import Path
 
 from models.schemas import FileInfo, FileUploadRequest, BuildStatus
@@ -13,6 +14,8 @@ from services.embedding_service import embedding_service
 from config import KNOWLEDGE_BASE_DIR
 
 router = APIRouter(prefix="/files", tags=["files"])
+
+logger = logging.getLogger(__name__)
 
 
 @router.post("/upload", response_model=FileInfo)
@@ -99,8 +102,8 @@ async def delete_file(company_id: str, file_id: str):
             raise HTTPException(status_code=404, detail=f"File {file_id} not found")
         
         # Delete from vector store
-        from db.chroma_manager import chroma_manager
-        chroma_manager.delete_documents_from_company(company_id, [file_id])
+        from db.pinecone_manager import pinecone_manager
+        pinecone_manager.delete_company_documents(company_id, file_id=file_id)
         
         return {"message": f"File {file_id} deleted successfully"}
         
@@ -125,10 +128,46 @@ async def get_file_stats(company_id: str):
 @router.get("/build-status/{company_id}", response_model=BuildStatus)
 async def get_build_status(company_id: str):
     """Get build status for a company's vector database"""
+
+    try:
+        logger.info(f"Getting build status for company: {company_id}")
+
+        # Sanitize company_id for filesystem safety
+        sanitized_company_id = company_id.replace(' ', '_').replace('-', '_').lower()
+
+        # Validate company exists
+        company_dir = file_service.get_company_directory(sanitized_company_id)
+        if not company_dir.exists():
+            logger.warning(f"Company not found: {company_id}")
+            raise HTTPException(status_code=404, detail=f"Company {company_id} not found")
+
+        # Get build status from service
+        build_status = embedding_service.get_build_status(sanitized_company_id)
+
+        # Add additional metadata if status is completed
+        if build_status.status == "completed":
+            try:
+                # Get company stats for additional context
+                company_stats = file_service.get_company_file_stats(sanitized_company_id)
+                if company_stats:
+                    build_status.message = f"{build_status.message} ({company_stats['total_files']} files, {company_stats.get('total_size_mb', 0):.1f} MB)"
+                    logger.info(f"Enhanced build status with stats for {company_id}: {company_stats['total_files']} files")
+            except Exception as e:
+                # Don't fail the request if stats retrieval fails
+                logger.warning(f"Could not get company stats for {sanitized_company_id}: {e}")
+
+        logger.info(f"Build status for {company_id}: {build_status.status} - {build_status.message}")
+        return build_status
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        logger.error(f"Invalid company ID format for {company_id}: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid company ID format: {str(e)}")
+    except Exception as e:
+        logger.error(f"Failed to get build status for {company_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get build status: {str(e)}")
     
-    return embedding_service.get_build_status(company_id)
-
-
 @router.get("/file-paths/{company_id}")
 async def get_company_file_paths(company_id: str):
     """Get static file paths for all files in a company for frontend viewing"""

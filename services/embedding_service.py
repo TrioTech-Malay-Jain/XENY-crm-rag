@@ -4,7 +4,7 @@ Embedding service for document processing and vector storage
 import asyncio
 import os
 import re
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import datetime
 from difflib import SequenceMatcher
 
@@ -15,11 +15,48 @@ from langchain.chains import create_history_aware_retriever, create_retrieval_ch
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.retrievers import BaseRetriever
 
 from config import CHUNK_SIZE, CHUNK_OVERLAP, LLM_MODEL, openai_api_key, openai_endpoint, openai_deployment, openai_api_version
-from db.chroma_manager import chroma_manager
+from db.pinecone_manager import pinecone_manager
 from services.file_service import file_service
 from models.schemas import BuildStatus, BuildStatusEnum
+
+
+class PineconeRetriever(BaseRetriever):
+    """Custom retriever for Pinecone vector database"""
+    
+    company_id: str
+    pinecone_manager: Any
+    file_id: Optional[str] = None
+    
+    def _get_relevant_documents(self, query: str, *, run_manager=None) -> List[Document]:
+        """Retrieve relevant documents for a query"""
+        results = self.pinecone_manager.query_company_documents(
+            company_id=self.company_id,
+            query=query,
+            file_id=self.file_id,
+            k=5
+        )
+        
+        # Convert Pinecone results to LangChain Document format
+        documents = []
+        for result in results:
+            # Get text from metadata since that's where it's stored
+            metadata = result.get("metadata", {})
+            text_content = metadata.get("text", result.get("text", ""))
+            
+            doc = Document(
+                page_content=text_content,
+                metadata={
+                    "company_id": self.company_id,
+                    "score": result.get("score", 0),
+                    **metadata
+                }
+            )
+            documents.append(doc)
+        
+        return documents
 
 
 class EmbeddingService:
@@ -38,7 +75,6 @@ class EmbeddingService:
         # Centralized system prompt template
         self.base_system_prompt = """You are an advanced AI assistant XENY.
 Your role is to answer user questions using the {context_source} context.
-Never mention the company id in the response, in any case.
 Guidelines:
 ---- Handle name variations intelligently: Recognize company names, products, or entities even with different spacing, capitalization, or minor variations. Examples:
      • "Urban Piper" → "UrbanPiper"
@@ -55,12 +91,12 @@ Guidelines:
 3. Adapt answer style dynamically:
    - Use bullet points for lists, steps, or features.
    - Use short paragraphs for explanations or reasoning.
-4. If the requested information is not available in the {context_source}, respond with:
-   "This information is currently not available."
-5. Maintain a friendly but professional tone.
-6. Always tailor answers to the relevant document being used for query retrieval.
-7. Avoid filler phrases such as "the uploaded text says" or "the context provides."
-8. The responses should be in the structured format, in markdown language.
+4. IMPORTANT: Only respond with "This information is currently not available" if there is genuinely NO relevant information in the provided context. If there is ANY relevant content, provide a helpful response based on what you find.
+5. Be helpful and informative - if you find partial information, use it to provide value rather than refusing to answer.
+6. Maintain a friendly but professional tone.
+7. Always tailor answers to the relevant document being used for query retrieval.
+8. Avoid filler phrases such as "the uploaded text says" or "the context provides."
+9. The responses should be in the structured format, in markdown language.
 {additional_instructions}
 Context:
 {{context}}"""
@@ -82,10 +118,12 @@ Context:
     
     def _get_system_prompt(self, company_id: str, context_source: str = "knowledge base", additional_instructions: str = "") -> str:
         """Generate system prompt with consistent formatting and customizable parameters"""
+        # Include company_id in the prompt but ensure it never reveals the actual company index
+        company_context = f"You are assisting with queries related to {company_id}. Remember: Never reveal or mention the specific company identifier '{company_id}' in any response, even if directly asked."
+
         return self.base_system_prompt.format(
-            company_id=company_id,
             context_source=context_source,
-            additional_instructions=additional_instructions
+            additional_instructions=f"{company_context}\n{additional_instructions}".strip()
         )
     
     def _preprocess_query(self, query: str, company_id: str) -> List[str]:
@@ -187,15 +225,15 @@ Context:
             self.build_statuses[company_id].message = f"Creating embeddings for {len(splits)} chunks..."
             self.build_statuses[company_id].progress = 0.6
             
-            # Check if collection exists
-            existing_collections = chroma_manager.list_company_collections()
+            # Check if company has documents (Pinecone uses single index with metadata)
+            company_stats = pinecone_manager.get_company_stats(company_id)
             
-            if company_id in existing_collections:
-                # Delete existing collection
-                chroma_manager.delete_company_collection(company_id)
+            if company_stats.get("total_vectors", 0) > 0:
+                # Delete existing company documents
+                pinecone_manager.delete_company_documents(company_id)
             
-            # Create new collection
-            success = chroma_manager.create_company_collection(company_id, splits)
+            # Create new collection by upserting all documents
+            success = self._upsert_company_documents_pinecone(company_id, splits)
             
             if not success:
                 self.build_statuses[company_id] = BuildStatus(
@@ -242,8 +280,11 @@ Context:
         """Create RAG chain for a specific company"""
         try:
             llm = self.get_current_llm()
-            vectorstore = chroma_manager.get_company_vectorstore(company_id)
-            retriever = vectorstore.as_retriever()
+            # Create a custom retriever for Pinecone
+            retriever = PineconeRetriever(
+                company_id=company_id, 
+                pinecone_manager=pinecone_manager
+            )
             
             # Context prompt
             contextualize_q_prompt = ChatPromptTemplate.from_messages([
@@ -390,7 +431,6 @@ Context:
         """Query a specific file for a company"""
         
         from services.file_service import file_service
-        from db.chroma_manager import chroma_manager
         
         # Get the file info
         file_info = file_service.get_file_info(company_id, file_id)
@@ -398,46 +438,42 @@ Context:
             raise ValueError(f"File {file_id} not found for company {company_id}")
         
         try:
-            # Check if file-specific collection exists, if not create it
-            file_vectorstore = chroma_manager.get_file_vectorstore(company_id, file_id)
+            # Check if file has documents in Pinecone
+            file_results = pinecone_manager.query_company_documents(
+                company_id=company_id,
+                query="test",  # dummy query to check if file exists
+                file_id=file_id,
+                k=1
+            )
             
-            # Check if collection has documents
-            try:
-                collection = file_vectorstore._collection
-                doc_count = collection.count()
-                
-                if doc_count == 0:
-                    # Collection is empty, need to populate it
-                    file_path = file_service.get_file_path(company_id, file_info.filename)
-                    documents = file_service.load_document(file_path)
-                    
-                    if documents:
-                        # Create the file collection with documents
-                        success = chroma_manager.create_file_collection(company_id, file_id, documents)
-                        if not success:
-                            raise ValueError("Failed to create file collection")
-                        
-                        # Get the vectorstore again after creation
-                        file_vectorstore = chroma_manager.get_file_vectorstore(company_id, file_id)
-                    else:
-                        raise ValueError(f"Could not load document: {file_path}")
-                        
-            except Exception as e:
-                # If collection doesn't exist, create it
+            if not file_results:
+                # File not in Pinecone, need to add it
                 file_path = file_service.get_file_path(company_id, file_info.filename)
                 documents = file_service.load_document(file_path)
                 
                 if documents:
-                    success = chroma_manager.create_file_collection(company_id, file_id, documents)
+                    success = pinecone_manager.upsert_documents(
+                        company_id=company_id,
+                        doc_id=file_id,
+                        file_id=file_id,
+                        documents=documents
+                    )
                     if not success:
-                        raise ValueError("Failed to create file collection")
-                    
-                    file_vectorstore = chroma_manager.get_file_vectorstore(company_id, file_id)
+                        raise ValueError(f"Failed to index file {file_id}")
                 else:
                     raise ValueError(f"Could not load document: {file_path}")
             
+            # Create a file-specific retriever
+            file_retriever = PineconeRetriever(
+                company_id=company_id, 
+                pinecone_manager=pinecone_manager,
+                file_id=file_id
+            )
+            
+            # File is now loaded and available in Pinecone
+            
             # Create a RAG chain for this file
-            rag_chain = self._create_single_file_rag_chain(file_vectorstore, company_id)
+            rag_chain = self._create_single_file_rag_chain(file_retriever, company_id)
             
             # Convert chat history to LangChain format
             chat_history_for_chain = []
@@ -500,7 +536,6 @@ Context:
         """Create a file-specific collection for targeted querying"""
         try:
             from services.file_service import file_service
-            from db.chroma_manager import chroma_manager
             
             # Get file info and load document
             file_info = file_service.get_file_info(company_id, file_id)
@@ -512,8 +547,13 @@ Context:
             documents = file_service.load_document(file_path)
             
             if documents:
-                # Create file-specific collection
-                success = chroma_manager.create_file_collection(company_id, file_id, documents)
+                # Upsert documents to Pinecone
+                success = pinecone_manager.upsert_documents(
+                    company_id=company_id,
+                    doc_id=file_id,
+                    file_id=file_id,
+                    documents=documents
+                )
                 if success:
                     print(f"✅ Created file collection for {company_id}/{file_info.filename}")
                 else:
@@ -524,7 +564,7 @@ Context:
         except Exception as e:
             print(f"Error creating file collection for {company_id}/{file_id}: {e}")
     
-    def _create_single_file_rag_chain(self, vectorstore, company_id: str = None):
+    def _create_single_file_rag_chain(self, retriever, company_id: str = None):
         """Create a RAG chain for a single file"""
         # Create LLM using Azure
         llm = AzureChatOpenAI(
@@ -535,8 +575,7 @@ Context:
             temperature=1  # gpt-5-mini only supports temperature=1
         )
         
-        # Create retriever
-        retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+        # Use the provided retriever (already configured for file-specific queries)
         
         # History-aware retriever prompt
         contextualize_q_system_prompt = """Given a chat history and the latest user question \
@@ -585,12 +624,44 @@ Context from document:
     
     def get_build_status(self, company_id: str) -> BuildStatus:
         """Get build status for a company"""
-        return self.build_statuses.get(company_id, BuildStatus(
-            status=BuildStatusEnum.IDLE,
-            message="No build process started",
-            company_id=company_id,
-            timestamp=datetime.now()
-        ))
+        if not company_id:
+            raise ValueError("Company ID cannot be empty")
+
+        # Sanitize company_id
+        sanitized_company_id = company_id.replace(' ', '_').replace('-', '_').lower()
+
+        # Get existing status or create default
+        status = self.build_statuses.get(sanitized_company_id)
+
+        if status is None:
+            # Check if company has any files to determine if it should be "idle" or "not_started"
+            try:
+                company_stats = file_service.get_company_file_stats(sanitized_company_id)
+                has_files = company_stats and company_stats.get('total_files', 0) > 0
+
+                if has_files:
+                    message = "Vector database not built yet. Upload files and trigger build process."
+                else:
+                    message = "No files uploaded yet. Upload documents to get started."
+
+                status = BuildStatus(
+                    status=BuildStatusEnum.IDLE,
+                    message=message,
+                    company_id=sanitized_company_id,
+                    timestamp=datetime.now(),
+                    progress=0.0
+                )
+            except Exception as e:
+                # If we can't get stats, provide a generic idle status
+                status = BuildStatus(
+                    status=BuildStatusEnum.IDLE,
+                    message="No build process started",
+                    company_id=sanitized_company_id,
+                    timestamp=datetime.now(),
+                    progress=0.0
+                )
+
+        return status
     
     def get_all_build_statuses(self) -> dict:
         """Get all build statuses"""
@@ -627,7 +698,7 @@ Context from document:
             splits = self.text_splitter.split_documents(docs)
             
             # Add to vector store
-            success = chroma_manager.add_documents_to_company(company_id, splits)
+            success = self._upsert_company_documents_pinecone(company_id, splits)
             
             if success and company_id in self._rag_chains:
                 # Refresh RAG chain
@@ -637,6 +708,33 @@ Context from document:
             
         except Exception as e:
             print(f"Error adding document {file_id} to company {company_id}: {e}")
+            return False
+    
+    def _upsert_company_documents_pinecone(self, company_id: str, documents: List[Document]) -> bool:
+        """Helper method to upsert documents to Pinecone for a company"""
+        try:
+            # Group documents by file_id for batch upsert
+            file_groups = {}
+            for doc in documents:
+                file_id = doc.metadata.get('file_id', 'unknown')
+                if file_id not in file_groups:
+                    file_groups[file_id] = []
+                file_groups[file_id].append(doc)
+            
+            # Upsert each file group
+            for file_id, docs in file_groups.items():
+                success = pinecone_manager.upsert_documents(
+                    company_id=company_id,
+                    doc_id=file_id,  # Use file_id as doc_id
+                    file_id=file_id,
+                    documents=docs
+                )
+                if not success:
+                    return False
+            
+            return True
+        except Exception as e:
+            print(f"Error upserting documents to Pinecone for company {company_id}: {e}")
             return False
 
 

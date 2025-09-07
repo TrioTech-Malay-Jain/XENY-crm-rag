@@ -1,1 +1,1 @@
-from .chroma_manager import chroma_manager, ChromaManager
+from .pinecone_manager import pinecone_manager, PineconeManager

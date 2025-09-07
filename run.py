@@ -34,13 +34,18 @@ async def lifespan(app: FastAPI):
     else:
         print("✅ Azure OpenAI configuration loaded")
     
-    # List existing companies
-    from db.chroma_manager import chroma_manager
-    companies = chroma_manager.list_company_collections()
-    if companies:
-        print(f"📊 Found {len(companies)} existing companies: {companies}")
+    # List existing companies from knowledge base directory
+    from pathlib import Path
+    from config import KNOWLEDGE_BASE_DIR
+    kb_path = Path(KNOWLEDGE_BASE_DIR)
+    if kb_path.exists():
+        companies = [d.name for d in kb_path.iterdir() if d.is_dir()]
+        if companies:
+            print(f"📊 Found {len(companies)} existing companies: {companies}")
+        else:
+            print("📁 No existing companies found")
     else:
-        print("📁 No existing companies found")
+        print("📁 Knowledge base directory not found")
     
     print("✅ Application startup complete!")
     
@@ -117,17 +122,21 @@ async def home(request: Request):
 @app.get("/api/v1/health", response_model=HealthCheck)
 async def health_check():
     """Health check endpoint"""
-    from config import openai_api_key
+    from config import openai_api_key, KNOWLEDGE_BASE_DIR
     from services.embedding_service import embedding_service
-    from db.chroma_manager import chroma_manager
+    from pathlib import Path
     
-    companies = chroma_manager.list_company_collections()
+    # Count companies from knowledge base directory
+    kb_path = Path(KNOWLEDGE_BASE_DIR)
+    companies_count = 0
+    if kb_path.exists():
+        companies_count = len([d for d in kb_path.iterdir() if d.is_dir()])
     
     return HealthCheck(
         status="healthy",
         version="2.0.0",
         rag_initialized=len(embedding_service._rag_chains) > 0,
-        companies_loaded=len(companies),
+        companies_loaded=companies_count,
         api_keys_available=1 if openai_api_key else 0,
         timestamp=datetime.now()
     )

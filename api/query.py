@@ -18,7 +18,7 @@ chat_sessions: Dict[str, List[ChatMessage]] = {}
 
 @router.post("/", response_model=QueryResponse)
 async def query_documents(request: QueryRequest):
-    """Query documents for a specific company"""
+    """Query documents for a specific company (File Id is optional....)"""
     
     try:
         # Query the embedding service

@@ -62,13 +62,18 @@ openai_api_version = os.getenv("AZURE_OPENAI_API_VERSION")
 # Separate deployment for embeddings
 openai_embedding_deployment = os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-ada-002")
 
-# Embedding provider settings
-USE_HF_EMBEDDINGS = os.getenv("USE_HF_EMBEDDINGS", "false").lower() == "true"
-HF_EMBEDDING_MODEL = os.getenv("HF_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+# Pinecone settings
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "xeny-crm-rag")
+PINECONE_DIMENSION = int(os.getenv("PINECONE_DIMENSION", "768"))
+PINECONE_METRIC = os.getenv("PINECONE_METRIC", "cosine")
+PINECONE_CLOUD = os.getenv("PINECONE_CLOUD", "aws")
+PINECONE_REGION = os.getenv("PINECONE_REGION", "us-east-1")
+PINECONE_NAMESPACE = os.getenv("PINECONE_NAMESPACE", "default")
 
 # Embedding provider settings
 USE_HF_EMBEDDINGS = os.getenv("USE_HF_EMBEDDINGS", "false").lower() == "true"
-HF_EMBEDDING_MODEL = os.getenv("HF_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+HF_EMBEDDING_MODEL = os.getenv("HF_EMBEDDING_MODEL", "sentence-transformers/all-mpnet-base-v2")
 
 # Embedding model settings
 EMBEDDING_MODEL = "models/embedding-001"
