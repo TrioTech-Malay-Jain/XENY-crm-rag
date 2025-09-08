@@ -63,13 +63,13 @@ openai_api_version = os.getenv("AZURE_OPENAI_API_VERSION")
 openai_embedding_deployment = os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-ada-002")
 
 # Pinecone settings
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "xeny-crm-rag")
-PINECONE_DIMENSION = int(os.getenv("PINECONE_DIMENSION", "768"))
-PINECONE_METRIC = os.getenv("PINECONE_METRIC", "cosine")
-PINECONE_CLOUD = os.getenv("PINECONE_CLOUD", "aws")
-PINECONE_REGION = os.getenv("PINECONE_REGION", "us-east-1")
-PINECONE_NAMESPACE = os.getenv("PINECONE_NAMESPACE", "default")
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY_RAG")
+PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME_RAG", "xeny-crm-rag")
+PINECONE_DIMENSION = int(os.getenv("PINECONE_DIMENSION_RAG", "768"))
+PINECONE_METRIC = os.getenv("PINECONE_METRIC_RAG", "cosine")
+PINECONE_CLOUD = os.getenv("PINECONE_CLOUD_RAG", "aws")
+PINECONE_REGION = os.getenv("PINECONE_REGION_RAG", "us-east-1")
+PINECONE_NAMESPACE = os.getenv("PINECONE_NAMESPACE_RAG", "default")
 
 # Embedding provider settings
 USE_HF_EMBEDDINGS = os.getenv("USE_HF_EMBEDDINGS", "false").lower() == "true"

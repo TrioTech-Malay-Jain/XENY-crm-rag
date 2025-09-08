@@ -45,3 +45,11 @@ understanding.md
 
 # Temporary files
 copy_utils.py
+
+.github/
+copilot-instructions.md
+
+.env1
+.github/copilot-instructions.md
+/.github
+/.github
